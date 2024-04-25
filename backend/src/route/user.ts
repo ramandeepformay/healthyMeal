@@ -1,18 +1,26 @@
-import { Hono } from "hono";
+import { Hono } from "hono"
+import { sign } from 'hono/jwt'
 import { PrismaClient } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
-import { z } from "zod";
-import { sign } from 'hono/jwt'
+import { z } from "zod"
 
 const app = new Hono<{
     Bindings: {
-        DATABASE_URL: string,
-        JWT_SECRET: string
+        JWT_SECRET: string,
+        DATABASE_URL: string
     },
     Variables: {
+        userId: string,
         prisma: any
     }
 }>();
+app.use("*", async (c, next) => {
+    const prisma = new PrismaClient({
+        datasourceUrl: c.env.DATABASE_URL,
+    }).$extends(withAccelerate());
+    c.set("prisma", prisma)
+    await next()
+})
 
 const signUpSchema = z.object({
     name: z.string(),
@@ -27,20 +35,11 @@ const signInSchema = z.object({
 
 })
 
-// middleware
-app.use("*", async (c, next) => {
-    const prisma = new PrismaClient({
-        datasourceUrl: c.env.DATABASE_URL,
-    }).$extends(withAccelerate());
-    c.set("prisma", prisma)
-    await next()
-})
 
-// Signup page
 app.post("/signup", async (c) => {
     const prisma = c.get("prisma");
     const body = await c.req.json();
-    console.log(body)
+    // console.log(body)
     try {
         const { success } = signUpSchema.safeParse(body);
         if (!success) {
@@ -63,37 +62,34 @@ app.post("/signup", async (c) => {
     } catch (e) {
         console.error(e)
         c.status(403)
-        return c.json({ error: "Error while signing up" })
+        return c.json({ msg: "Error while signing up" })
     }
 })
 
-// Signin page
 app.post("/signin", async (c) => {
     const prisma = c.get("prisma");
     const body = await c.req.json();
-    console.log(body)
     try {
-        const { success } = signInSchema.safeParse(body);
-        if (!success) {
+        const {success} = signInSchema.safeParse(body);
+        if(!success){
             c.status(411)
-            return c.json({ error: "Invalid inputs" })
+            return c.json({error: "Invalid inputs"})
         }
-        const existingUser = await prisma.user.findUnique({
-            where: {
-                email: body.email,
-                password: body.password
-            }
-        })
-        if (!existingUser) {
-            return c.json({ error: "User not found" })
+    const existingUser = prisma.user.findUnique({
+        where:{
+            email: body.email,
+            password:body.password
         }
-        const token = await sign(existingUser.id, c.env.JWT_SECRET)
-        return c.json({ token })
+    })
+    if(!existingUser){
+        return c.json({error: "User not found"})
+    }
+    const token = await sign(existingUser.id, c.env.JWT_SECRET)
     }
     catch (e) {
         console.error(e)
         c.status(403)
-        return c.json({ error: "Error while signing in" })
+        return c.json({msg: "Error while signing in"})
     }
 })
 
