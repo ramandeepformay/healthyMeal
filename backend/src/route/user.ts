@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import { sign } from 'hono/jwt'
 import { PrismaClient } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
+
 import { z } from "zod"
 
 const app = new Hono<{
@@ -14,6 +15,7 @@ const app = new Hono<{
         prisma: any
     }
 }>();
+
 app.use("*", async (c, next) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
@@ -21,6 +23,8 @@ app.use("*", async (c, next) => {
     c.set("prisma", prisma)
     await next()
 })
+
+
 
 const signUpSchema = z.object({
     name: z.string(),
@@ -39,9 +43,11 @@ const signInSchema = z.object({
 app.post("/signup", async (c) => {
     const prisma = c.get("prisma");
     const body = await c.req.json();
-    // console.log(body)
+     
     try {
+        console.log(body)
         const { success } = signUpSchema.safeParse(body);
+       
         if (!success) {
             c.status(411)
             return c.json({ error: "Invalid inputs" })

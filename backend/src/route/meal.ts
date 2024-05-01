@@ -1,6 +1,6 @@
 import { Hono } from "hono"
 import { verify } from 'hono/jwt'
-import { PrismaClient } from '@prisma/client/edge'
+import { PrismaClient, UserRole } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
 import { z } from "zod"
 
@@ -64,7 +64,7 @@ app.post("/", async (c) => {
             data: {
                 title: body.title,
                 description: body.description,
-                price:body.price,
+                price: body.price,
                 authorId: userId
             }
         })
@@ -73,6 +73,30 @@ app.post("/", async (c) => {
         console.error(e)
         c.status(403);
         return c.json({ msg: "error while creating" })
+    }
+
+})
+
+app.get("/", async (c) => {
+    const prisma = c.get("prisma");
+    const userId = c.get("userId");
+
+    try {
+        console.log("yes", userId)
+        const meals = await prisma.user.findMany({
+            where: {
+                role: "ADMIN",
+                email: "aman@gmail.com"
+            }, 
+            select: {
+                meal: true
+            }
+        })
+
+        return c.json(meals)
+    } catch (e) {
+        console.error(e)
+        return c.json({ Error: "Error while getting all meals" })
     }
 
 })
